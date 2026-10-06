@@ -13,7 +13,11 @@ GetVirtualMobilityModel(Ptr<SpectrumChannel> channel, Ptr<MobilityModel> tx, Ptr
     // This is required, since we do not send SSBs for our RSRP based attachment nor ideal
     // beamforming. SSBs are wrapped automatically by the spectrum channel from ns-3.46 and onwards,
     // if a wraparound mobility model is set.
+#if NR_HAS_WRAPAROUND_MODEL
     auto wraparound = channel->GetObject<WraparoundModel>();
     return wraparound ? wraparound->GetVirtualMobilityModel(tx, rx) : tx;
+#else
+    return tx;
+#endif
 }
 } // namespace ns3

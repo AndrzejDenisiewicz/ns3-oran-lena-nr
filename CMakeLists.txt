@@ -2,6 +2,25 @@
 #
 # SPDX-License-Identifier: GPL-2.0-only
 
+if(EXISTS "${PROJECT_SOURCE_DIR}/src/spectrum/model/wraparound-model.h"
+   AND EXISTS "${PROJECT_SOURCE_DIR}/src/spectrum/model/wraparound-model.cc")
+  set(NR_HAS_WRAPAROUND_MODEL 1)
+  message(STATUS "nr: enabling upstream ns-3 wraparound support")
+else()
+  set(NR_HAS_WRAPAROUND_MODEL 0)
+  message(WARNING "nr: ns-3 wraparound support unavailable; using tx mobility fallback")
+endif()
+add_compile_definitions(NR_HAS_WRAPAROUND_MODEL=${NR_HAS_WRAPAROUND_MODEL})
+
+file(READ "${PROJECT_SOURCE_DIR}/src/mobility/model/mobility-model.h" NR_MOBILITY_MODEL_HEADER)
+string(FIND "${NR_MOBILITY_MODEL_HEADER}" "virtual Ptr<MobilityModel> Copy() const" NR_MOBILITY_MODEL_COPY_POS)
+if(NR_MOBILITY_MODEL_COPY_POS GREATER -1)
+  set(NR_MOBILITY_MODEL_HAS_COPY 1)
+else()
+  set(NR_MOBILITY_MODEL_HAS_COPY 0)
+endif()
+add_compile_definitions(NR_MOBILITY_MODEL_HAS_COPY=${NR_MOBILITY_MODEL_HAS_COPY})
+
 if(${ENABLE_EIGEN})
   set(eigen_sources
       model/nr-mimo-matrices-eigen.cc
@@ -171,6 +190,7 @@ set(source_files
     model/nr-mimo-chunk-processor.cc
     model/nr-mimo-matrices.cc
     model/nr-mimo-signal.cc
+    model/nr-model-translator.cc
     model/nr-net-device.cc
     model/nr-no-op-component-carrier-manager.cc
     model/nr-no-op-handover-algorithm.cc
@@ -240,7 +260,14 @@ set(source_files
     utils/nr-wraparound-utils.cc
 )
 
+find_package(CURL REQUIRED)
+
+if(CURL_FOUND)
+  include_directories(${CURL_INCLUDE_DIRS})
+endif()
+
 set(header_files
+    nr-export.h
     helper/beamforming-helper-base.h
     helper/cc-bwp-helper.h
     helper/file-scenario-helper.h
@@ -626,9 +653,14 @@ build_lib(
     ${libapplications}
     ${libcsma}
     ${libconfig-store}
+    ${liboran-interface}
+    ${CURL_LIBRARIES}
     ${opengym_libraries}
   TEST_SOURCES ${test_sources}
-  GENERATE_EXPORT_HEADER
+)
+
+target_include_directories(libnr-obj PRIVATE
+  "${PROJECT_SOURCE_DIR}/contrib/oran-interface/model"
 )
 
 # Symbol-visibility opt-in for the nr library only.

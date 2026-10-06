@@ -19,7 +19,7 @@
 #include "ns3/object.h"
 #include "ns3/pointer.h"
 #include "ns3/simple-channel.h"
-#include "ns3/string.h"
+#include "ns3/ns3-string.h"
 #include "ns3/system-path.h"
 
 #include <algorithm>

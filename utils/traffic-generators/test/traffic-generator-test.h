@@ -19,7 +19,7 @@
 #include "ns3/simple-channel.h"
 #include "ns3/simple-net-device.h"
 #include "ns3/simulator.h"
-#include "ns3/string.h"
+#include "ns3/ns3-string.h"
 #include "ns3/test.h"
 #include "ns3/three-gpp-http-variables.h"
 #include "ns3/traffic-generator-helper.h"

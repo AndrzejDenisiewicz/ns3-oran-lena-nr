@@ -11,6 +11,10 @@
 #include "ns3/nr-export.h"
 #include "ns3/random-variable-stream.h"
 
+#ifndef NR_MOBILITY_MODEL_HAS_COPY
+#define NR_MOBILITY_MODEL_HAS_COPY 0
+#endif
+
 namespace ns3
 {
 
@@ -39,10 +43,12 @@ class NR_EXPORT RandomDirectionDisc2dMobilityModel : public MobilityModel
     RandomDirectionDisc2dMobilityModel();
     ~RandomDirectionDisc2dMobilityModel() override;
 
+#if NR_MOBILITY_MODEL_HAS_COPY
     Ptr<MobilityModel> Copy() const override
     {
         return CreateObject<RandomDirectionDisc2dMobilityModel>(*this);
     }
+#endif
 
   private:
     void DoDispose() override;

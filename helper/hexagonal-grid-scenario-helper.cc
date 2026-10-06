@@ -7,12 +7,14 @@
 #include "ns3/constant-velocity-mobility-model.h"
 #include "ns3/double.h"
 #include "ns3/fast-fading-constant-position-mobility-model.h"
+#if NR_HAS_WRAPAROUND_MODEL
 #include "ns3/hexagonal-wraparound-model.h"
+#endif
 #include "ns3/mobility-helper.h"
 #include "ns3/random-direction-2d-mobility-model.h"
 #include "ns3/random-direction-disc-2d-mobility-model.h"
 #include "ns3/rectangle.h"
-#include "ns3/string.h"
+#include "ns3/ns3-string.h"
 
 #include <algorithm>
 #include <cmath>
@@ -436,11 +438,13 @@ HexagonalGridScenarioHelper::CreateScenarioWithMobility(const Vector& indoorUeSp
     Ptr<ListPositionAllocator> sitePosVector = CreateObject<ListPositionAllocator>();
     Ptr<ListPositionAllocator> utPosVector = CreateObject<ListPositionAllocator>();
 
+#if NR_HAS_WRAPAROUND_MODEL
     Ptr<HexagonalWraparoundModel> wraparound = nullptr;
     if (m_installWraparound)
     {
         wraparound = CreateObject<HexagonalWraparoundModel>(m_isd, GetNumSites());
     }
+#endif
 
     Rectangle outdoorBoundingBox{0, 0, 0, 0};
     // BS position
@@ -475,10 +479,12 @@ HexagonalGridScenarioHelper::CreateScenarioWithMobility(const Vector& indoorUeSp
         {
             // std::cout << GetSectorIndex(cellId) << std::endl;
             sitePosVector->Add(sitePos);
+#if NR_HAS_WRAPAROUND_MODEL
             if (wraparound)
             {
                 wraparound->AddSitePosition(sitePos);
             }
+#endif
         }
 
         // FIXME: Until sites can have more than one antenna array, it is necessary to apply some
@@ -770,10 +776,12 @@ HexagonalGridScenarioHelper::CreateScenarioWithMobility(const Vector& indoorUeSp
         mobility.SetPositionAllocator(utPosVector);
         mobility.Install(m_ut);
     }
+#if NR_HAS_WRAPAROUND_MODEL
     if (m_installWraparound)
     {
         m_wraparound = wraparound;
     }
+#endif
     PlotHexagonalDeployment(sitePosVector,
                             bsCenterVector,
                             picoBsPosVector,
@@ -798,11 +806,13 @@ HexagonalGridScenarioHelper::SetMaxUeDistanceToClosestSite(double maxUeDistanceT
     m_maxUeDistanceToClosestSite = maxUeDistanceToClosestSite;
 }
 
+#if NR_HAS_WRAPAROUND_MODEL
 Ptr<WraparoundModel>
 HexagonalGridScenarioHelper::GetWraparoundModel() const
 {
     return m_wraparound;
 }
+#endif
 
 void
 HexagonalGridScenarioHelper::InstallPicoCells(bool installPicoCells)

@@ -226,6 +226,12 @@ class NR_EXPORT NrGnbPhy : public NrPhy
      */
     double GetTxPower() const override;
 
+    void SetPortPowerScaling(double scalingFactor);
+    double GetPortPowerScaling() const;
+    double GetEffectiveTxPower() const;
+    double ComputePowerConsumption(double portScaling) const;
+    double GetCurrentPowerConsumption() const;
+
     /**
      * @brief Set the Tx power spectral density based on the RB index vector
      * @param rbIndexVector vector of the index of the RB (in SpectrumValue array)
@@ -928,6 +934,8 @@ class NR_EXPORT NrGnbPhy : public NrPhy
     EventId m_channelLostTimer; //!< Timer that, when expires, indicates that the channel is lost
 
     Ptr<NrChAccessManager> m_cam; //!< Channel Access Manager
+
+    double m_portPowerScaling{1.0}; //!< Fraction of active antenna ports
 
     friend class NrPatternTestCase;
 

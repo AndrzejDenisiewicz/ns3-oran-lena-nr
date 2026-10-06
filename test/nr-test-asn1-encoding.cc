@@ -28,7 +28,7 @@
 #include "ns3/nr-rrc-sap.h"
 #include "ns3/packet.h"
 #include "ns3/ptr.h"
-#include "ns3/string.h"
+#include "ns3/ns3-string.h"
 #include "ns3/test.h"
 
 #include <iomanip>

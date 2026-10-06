@@ -10,7 +10,7 @@
 
 #include "nr-lte-mi-error-model.h"
 
-#include "ns3/assert.h"
+#include "ns3/ns3-assert.h"
 #include "ns3/double.h"
 #include "ns3/enum.h"
 #include "ns3/log.h"

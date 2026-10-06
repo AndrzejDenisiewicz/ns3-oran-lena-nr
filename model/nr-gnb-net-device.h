@@ -10,8 +10,13 @@
 #include "nr-net-device.h"
 
 #include "ns3/deprecated.h"
+#include "ns3/event-id.h"
 #include "ns3/nr-export.h"
+#include "ns3/oran-interface.h"
 #include "ns3/traced-callback.h"
+
+#include <functional>
+#include <string>
 
 namespace ns3
 {
@@ -191,6 +196,13 @@ class NR_EXPORT NrGnbNetDevice : public NrNetDevice
      */
     uint16_t GetArfcnBwpId(uint32_t arfcn) const;
 
+    void SetPortPower(const std::vector<double>& portPower);
+    std::vector<double> GetPortPower() const;
+    double GetCurrentPowerConsumption() const;
+
+    void SetE2Termination(Ptr<E2Termination> termination);
+    Ptr<E2Termination> GetE2Termination() const;
+
   protected:
     void DoInitialize() override;
 
@@ -198,6 +210,11 @@ class NR_EXPORT NrGnbNetDevice : public NrNetDevice
     bool DoSend(Ptr<Packet> packet, const Address& dest, uint16_t protocolNumber) override;
 
   private:
+    void KpmSubscriptionCallback(E2AP_PDU_t* request);
+    void CccControlMessageCallback(E2AP_PDU_t* request);
+    void RicControlMessageCallback(E2AP_PDU_t* request);
+    void SendKpmIndication();
+    void StopE2Reporting();
     Ptr<NrGnbRrc> m_rrc;
     Ptr<NrHandoverAlgorithm> m_handoverAlgorithm; ///< the handover algorithm
 
@@ -210,6 +227,19 @@ class NR_EXPORT NrGnbNetDevice : public NrNetDevice
     Ptr<NrFhControl> m_nrFhControl;
 
     bool m_isCellConfigured{false}; ///< variable to check whether the RRC has been configured
+    Ptr<E2Termination> m_e2Termination;
+    EventId m_e2ReportingEvent;
+    EventId m_e2FileEvent;
+    E2Termination::RicSubscriptionRequest_rval_s m_e2Subscription{};
+    bool m_e2ReportingEnabled{false};
+    bool m_enableE2FileLogging{false};
+    bool m_enableCuUpReport{true};
+    std::string m_cuUpFileName;
+    double m_e2Periodicity{0.1};
+    uint32_t m_kpmFunctionId{2};
+    uint32_t m_rcFunctionId{3};
+    uint32_t m_cccFunctionId{4};
+    std::string m_kpmMappingPolicy{"explicit-rejection"};
 };
 
 } // namespace ns3

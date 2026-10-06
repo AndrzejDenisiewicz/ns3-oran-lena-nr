@@ -13,7 +13,7 @@
 #include "ns3/nr-spectrum-value-helper.h"
 #include "ns3/nr-wraparound-utils.h"
 #include "ns3/parse-string-to-vector.h"
-#include "ns3/string.h"
+#include "ns3/ns3-string.h"
 #include "ns3/uinteger.h"
 #include "ns3/uniform-planar-array.h"
 

@@ -16,7 +16,7 @@
 #include "ns3/object-factory.h"
 #include "ns3/pointer.h"
 #include "ns3/simulator.h"
-#include "ns3/string.h"
+#include "ns3/ns3-string.h"
 #include "ns3/three-gpp-channel-model.h"
 #include "ns3/three-gpp-propagation-loss-model.h"
 #include "ns3/three-gpp-spectrum-propagation-loss-model.h"
@@ -101,10 +101,12 @@ Ptr<SpectrumChannel>
 NrChannelHelper::CreateChannel(uint8_t flags)
 {
     auto channel = CreateObject<MultiModelSpectrumChannel>();
+#if NR_HAS_WRAPAROUND_MODEL
     if (m_wraparoundModel)
     {
         channel->UnidirectionalAggregateObject(m_wraparoundModel);
     }
+#endif
     Ptr<ChannelConditionModel> channelConditionModel;
     if (m_channelConditionModel.IsTypeIdSet())
     {
@@ -418,10 +420,12 @@ NrChannelHelper::AddNrCsiRsFilter(Ptr<SpectrumChannel> channel)
     }
 }
 
+#if NR_HAS_WRAPAROUND_MODEL
 void
 NrChannelHelper::SetWraparoundModel(Ptr<WraparoundModel> wraparoundModel)
 {
     m_wraparoundModel = wraparoundModel;
 }
+#endif
 
 } // namespace ns3

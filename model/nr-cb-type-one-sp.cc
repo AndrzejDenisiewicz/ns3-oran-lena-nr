@@ -9,9 +9,13 @@
 #include "ns3/log.h"
 #include "ns3/math.h"
 #include "ns3/nr-spectrum-value-helper.h"
+#include "ns3/ns3-string.h"
 #include "ns3/uinteger.h"
 
 #include <complex.h>
+
+#include <algorithm>
+#include <sstream>
 
 namespace ns3
 {
@@ -44,7 +48,14 @@ TypeId
 NrCbTypeOneSp::GetTypeId()
 {
     static TypeId tid =
-        TypeId("ns3::NrCbTypeOneSp").SetParent<NrCbTypeOne>().AddConstructor<NrCbTypeOneSp>();
+        TypeId("ns3::NrCbTypeOneSp")
+            .SetParent<NrCbTypeOne>()
+            .AddConstructor<NrCbTypeOneSp>()
+            .AddAttribute("PortPower",
+                          "Power allocation for each antenna port as comma-separated linear ratios.",
+                          StringValue(""),
+                          MakeStringAccessor(&NrCbTypeOneSp::SetPortPowerString),
+                          MakeStringChecker());
     return tid;
 }
 
@@ -70,7 +81,65 @@ NrCbTypeOneSp::Init()
     InitNumI1();
     InitNumI2();
     InitWParams();
+
+    if (!m_portpower.empty())
+    {
+        SetPortPower(m_portpower);
+    }
 };
+
+void
+NrCbTypeOneSp::SetPortPowerString(const std::string& powerStr)
+{
+    if (powerStr.empty())
+    {
+        return;
+    }
+    std::vector<double> values;
+    std::stringstream stream(powerStr);
+    std::string token;
+    while (std::getline(stream, token, ','))
+    {
+        try
+        {
+            values.push_back(std::stod(token));
+        }
+        catch (const std::exception&)
+        {
+            NS_ABORT_MSG("Invalid PortPower value: " << token);
+        }
+    }
+    SetPortPower(values);
+}
+
+void
+NrCbTypeOneSp::SetPortPower(const std::vector<double>& powerVec)
+{
+    for (double value : powerVec)
+    {
+        NS_ASSERT_MSG(value >= 0.0, "Port power allocation must be non-negative");
+    }
+    m_portpower = powerVec;
+    if (m_nPorts > 0 && m_portpower.size() != m_nPorts)
+    {
+        m_portpower.resize(m_nPorts, m_portpower.empty() ? 1.0 : m_portpower.back());
+    }
+}
+
+const std::vector<double>&
+NrCbTypeOneSp::GetPortPower() const
+{
+    return m_portpower;
+}
+
+bool
+NrCbTypeOneSp::IsPowerAllocationActive() const
+{
+    return !m_portpower.empty() &&
+           std::any_of(m_portpower.begin(), m_portpower.end(), [](double value) {
+               return value != 1.0;
+           });
+}
 
 ComplexMatrixArray
 NrCbTypeOneSp::GetBasePrecMat(size_t i1, size_t i2) const
@@ -106,8 +175,11 @@ NrCbTypeOneSp::GetBasePrecMatFromIndex(size_t i11, size_t i12, size_t i13, size_
         for (size_t vIdx = 0; vIdx < v.size(); vIdx++)
         {
             // Fill in the precoding matrix W for both the first and second polarization
-            precMat(vIdx, layer) = normalizer * v[vIdx];
-            precMat(vIdx + v.size(), layer) = normalizer * m_signPhiN[layer] * phiN * v[vIdx];
+            const double upperPower = IsPowerAllocationActive() ? m_portpower[vIdx] : 1.0;
+            const double lowerPower = IsPowerAllocationActive() ? m_portpower[vIdx + v.size()] : 1.0;
+            precMat(vIdx, layer) = normalizer * std::sqrt(upperPower) * v[vIdx];
+            precMat(vIdx + v.size(), layer) =
+                normalizer * std::sqrt(lowerPower) * m_signPhiN[layer] * phiN * v[vIdx];
         }
     }
     return precMat;

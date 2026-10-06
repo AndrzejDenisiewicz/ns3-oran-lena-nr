@@ -6,7 +6,12 @@
 
 #include "ns3/angles.h"
 #include "ns3/enum.h"
+#ifndef NR_HAS_WRAPAROUND_MODEL
+#define NR_HAS_WRAPAROUND_MODEL 0
+#endif
+#if NR_HAS_WRAPAROUND_MODEL
 #include "ns3/hexagonal-wraparound-model.h"
+#endif
 #include "ns3/node.h"
 #include "ns3/uinteger.h"
 
@@ -121,11 +126,13 @@ CreateDirectPathBfv(const Ptr<MobilityModel>& a,
     // retrieve the position of the two devices
     Vector aPos = a->GetPosition();
     Vector bPos = b->GetPosition();
+#if NR_HAS_WRAPAROUND_MODEL
     auto wraparoundModel = b->GetObject<Node>()->GetObject<HexagonalWraparoundModel>();
     if (wraparoundModel)
     {
         bPos = wraparoundModel->GetVirtualPosition(aPos, bPos);
     }
+#endif
 
     // compute the azimuth and the elevation angles
     Angles completeAngle(bPos, aPos);

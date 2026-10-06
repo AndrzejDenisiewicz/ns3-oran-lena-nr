@@ -9,7 +9,7 @@
 #include "ns3/nr-gnb-net-device.h"
 #include "ns3/nr-ue-net-device.h"
 #include "ns3/simulator.h"
-#include "ns3/string.h"
+#include "ns3/ns3-string.h"
 
 #include <stdio.h>
 #include <string>

@@ -10,7 +10,12 @@
 #include "ns3/nr-export.h"
 #include "ns3/random-variable-stream.h"
 #include "ns3/vector.h"
+#ifndef NR_HAS_WRAPAROUND_MODEL
+#define NR_HAS_WRAPAROUND_MODEL 0
+#endif
+#if NR_HAS_WRAPAROUND_MODEL
 #include "ns3/wraparound-model.h"
+#endif
 
 #include <optional>
 
@@ -133,7 +138,9 @@ class NR_EXPORT HexagonalGridScenarioHelper : public NodeDistributionScenarioInt
      * @brief Retrieve associated wraparound model
      * @return Associated wraparound model
      */
+#if NR_HAS_WRAPAROUND_MODEL
     Ptr<WraparoundModel> GetWraparoundModel() const;
+#endif
 
     void InstallPicoCells(bool installPicoCells);
 
@@ -192,7 +199,9 @@ class NR_EXPORT HexagonalGridScenarioHelper : public NodeDistributionScenarioInt
     std::string m_simTag;     //!< simTag for the gnuplot file
 
     bool m_installWraparound{false};   //!< Whether to install wraparound model
+#if NR_HAS_WRAPAROUND_MODEL
     Ptr<WraparoundModel> m_wraparound; //!< Pointer to wraparound model, if set
+#endif
 
     //!< Whether to install pico-cells according to TR 36.839, used for large-scale handover
     //!< evaluation

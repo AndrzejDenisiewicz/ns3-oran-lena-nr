@@ -9,6 +9,9 @@
 
 #include "ns3/nr-export.h"
 
+#include <string>
+#include <vector>
+
 namespace ns3
 {
 class NrPmSearchMaleki; ///< Forward-declaration for friendship
@@ -57,6 +60,11 @@ class NR_EXPORT NrCbTypeOneSp : public NrCbTypeOne
     /// @return the number of i13 indices (co-phasing shifts for a secondary beam)
     /// @note if i13 is not defined and there is no secondary beam (e.g., in rank 1), this returns 1
     size_t GetNumI13() const;
+
+    void SetPortPowerString(const std::string& powerStr);
+    void SetPortPower(const std::vector<double>& powerVec);
+    const std::vector<double>& GetPortPower() const;
+    bool IsPowerAllocationActive() const;
 
   protected:
     /// @brief Init the number of i11 indices (horizontal beams)
@@ -196,6 +204,7 @@ class NR_EXPORT NrCbTypeOneSp : public NrCbTypeOne
 
     std::vector<size_t> m_uniqueBfvInds; ///< For each column in W, the beamforming vector index
     std::vector<double> m_signPhiN;      ///< For each column in W, the sign before phi_n
+    std::vector<double> m_portpower{};   ///< Per-port power allocation in linear scale
     friend class NrPmSearchMaleki;       ///< Grant access to variables to NrPmSearchMaleki
 };
 

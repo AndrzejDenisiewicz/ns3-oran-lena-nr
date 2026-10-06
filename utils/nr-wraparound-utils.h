@@ -8,7 +8,12 @@
 #include "ns3/mobility-model.h"
 #include "ns3/nr-export.h"
 #include "ns3/spectrum-channel.h"
+#ifndef NR_HAS_WRAPAROUND_MODEL
+#define NR_HAS_WRAPAROUND_MODEL 0
+#endif
+#if NR_HAS_WRAPAROUND_MODEL
 #include "ns3/wraparound-model.h"
+#endif
 
 namespace ns3
 {

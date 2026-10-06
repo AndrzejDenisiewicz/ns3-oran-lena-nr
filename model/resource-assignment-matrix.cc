@@ -6,7 +6,7 @@
 
 #include "../utils/termcolor.hpp"
 
-#include "ns3/assert.h"
+#include "ns3/ns3-assert.h"
 #include "ns3/log.h"
 
 namespace ns3

@@ -21,7 +21,7 @@
 #include "ns3/pointer.h"
 #include "ns3/simulator.h"
 #include "ns3/spectrum-converter.h"
-#include "ns3/string.h"
+#include "ns3/ns3-string.h"
 #include "ns3/uinteger.h"
 
 #include <fstream>

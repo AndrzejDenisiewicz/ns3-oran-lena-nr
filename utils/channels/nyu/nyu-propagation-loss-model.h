@@ -11,7 +11,7 @@
 
 #include "ns3/nr-export.h"
 #include "ns3/propagation-loss-model.h"
-#include "ns3/string.h"
+#include "ns3/ns3-string.h"
 
 namespace ns3
 {

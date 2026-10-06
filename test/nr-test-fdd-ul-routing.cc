@@ -37,7 +37,7 @@
 #include "ns3/position-allocator.h"
 #include "ns3/propagation-loss-model.h"
 #include "ns3/simulator.h"
-#include "ns3/string.h"
+#include "ns3/ns3-string.h"
 #include "ns3/test.h"
 #include "ns3/udp-echo-helper.h"
 #include "ns3/uinteger.h"

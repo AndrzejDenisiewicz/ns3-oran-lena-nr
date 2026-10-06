@@ -13,7 +13,7 @@
 #include "ns3/boolean.h"
 #include "ns3/log.h"
 #include "ns3/point-to-point-helper.h"
-#include "ns3/string.h"
+#include "ns3/ns3-string.h"
 
 namespace ns3
 {

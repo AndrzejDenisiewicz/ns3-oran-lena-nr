@@ -12,7 +12,7 @@
 #include "ns3/mobility-model.h"
 #include "ns3/node.h"
 #include "ns3/simulator.h"
-#include "ns3/string.h"
+#include "ns3/ns3-string.h"
 
 #include <cmath>
 

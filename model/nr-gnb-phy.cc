@@ -29,7 +29,9 @@
 #include "ns3/uinteger.h"
 
 #include <algorithm>
+#include <cmath>
 #include <functional>
+#include <limits>
 #include <random>
 #include <string>
 #include <unordered_set>
@@ -661,10 +663,54 @@ NrGnbPhy::SetTxPower(double pow)
     m_txPower = pow;
 }
 
+void
+NrGnbPhy::SetPortPowerScaling(double scalingFactor)
+{
+    NS_ASSERT_MSG(scalingFactor >= 0.0 && scalingFactor <= 1.0,
+                  "Port power scaling must be between 0 and 1");
+    m_portPowerScaling = scalingFactor;
+}
+
+double
+NrGnbPhy::GetPortPowerScaling() const
+{
+    return m_portPowerScaling;
+}
+
+double
+NrGnbPhy::GetEffectiveTxPower() const
+{
+    if (m_portPowerScaling <= 0.0)
+    {
+        return -std::numeric_limits<double>::infinity();
+    }
+    return m_txPower + 10.0 * std::log10(m_portPowerScaling);
+}
+
 double
 NrGnbPhy::GetTxPower() const
 {
-    return m_txPower;
+    return GetEffectiveTxPower();
+}
+
+double
+NrGnbPhy::ComputePowerConsumption(double portScaling) const
+{
+    NS_ASSERT_MSG(portScaling >= 0.0 && portScaling <= 1.0,
+                  "Port power scaling must be between 0 and 1");
+    // Relative P3/P4 values from 3GPP TR 38.864, scaled by the configured RF
+    // reference power.  This is intentionally independent of PHY callbacks so
+    // E2/CCC consumers observe the same value as the energy accounting path.
+    constexpr double pStatic = 55.0;
+    constexpr double pActive = 280.0;
+    const double pMaxWatts = std::pow(10.0, (m_txPower - 30.0) / 10.0);
+    return pMaxWatts * (pStatic + (pActive - pStatic) * portScaling) / pActive;
+}
+
+double
+NrGnbPhy::GetCurrentPowerConsumption() const
+{
+    return ComputePowerConsumption(m_portPowerScaling);
 }
 
 void

@@ -13,7 +13,12 @@
 #include "ns3/object-factory.h"
 #include "ns3/object.h"
 #include "ns3/spectrum-channel.h"
+#ifndef NR_HAS_WRAPAROUND_MODEL
+#define NR_HAS_WRAPAROUND_MODEL 0
+#endif
+#if NR_HAS_WRAPAROUND_MODEL
 #include "ns3/wraparound-model.h"
+#endif
 
 namespace ns3
 {
@@ -152,7 +157,9 @@ class NR_EXPORT NrChannelHelper : public Object
      * Install wraparound model to channels and propagation models created by this helper
      * @param wraparoundModel the wraparound model which will be installed
      */
+#if NR_HAS_WRAPAROUND_MODEL
     void SetWraparoundModel(Ptr<WraparoundModel> wraparoundModel);
+#endif
 
   private:
     /**
@@ -285,8 +292,10 @@ class NR_EXPORT NrChannelHelper : public Object
     ObjectFactory m_pathLossModel;         //!< The path loss object factory
     ObjectFactory m_spectrumModel;         //!< The phased spectrum object factory
     ObjectFactory m_channelConditionModel; //!< The channel condition object factory
+#if NR_HAS_WRAPAROUND_MODEL
     Ptr<WraparoundModel>
         m_wraparoundModel; //!< Wraparound model to aggregate to channel and propagation models
+#endif
 };
 } // namespace ns3
 #endif /* NR_CHANNEL_HELPER_H */

@@ -11,6 +11,12 @@
 #include "nr-gnb-mac.h"
 #include "nr-gnb-phy.h"
 #include "nr-gnb-rrc.h"
+#include "nr-model-translator.h"
+
+#include "ccc-message.h"
+#include "encode_e2apv1.hpp"
+#include "kpm-function-description.h"
+#include "ric-control-function-description.h"
 
 #include "ns3/abort.h"
 #include "ns3/ipv4-l3-protocol.h"
@@ -18,6 +24,10 @@
 #include "ns3/log.h"
 #include "ns3/object-map.h"
 #include "ns3/pointer.h"
+
+#include <numeric>
+#include <fstream>
+#include <string>
 
 namespace ns3
 {
@@ -52,7 +62,54 @@ NrGnbNetDevice::GetTypeId()
                           "The handover algorithm associated to this GnbNetDevice",
                           PointerValue(),
                           MakePointerAccessor(&NrGnbNetDevice::m_handoverAlgorithm),
-                          MakePointerChecker<NrHandoverAlgorithm>());
+                          MakePointerChecker<NrHandoverAlgorithm>())
+
+            .AddAttribute("E2Termination",
+                     "The E2 termination associated with this gNB",
+                     PointerValue(),
+                     MakePointerAccessor(&NrGnbNetDevice::SetE2Termination,
+                                         &NrGnbNetDevice::GetE2Termination),
+                     MakePointerChecker<E2Termination>())
+        .AddAttribute("EnableE2FileLogging",
+                      "Generate periodic CU-UP data in a local file",
+                      BooleanValue(false),
+                      MakeBooleanAccessor(&NrGnbNetDevice::m_enableE2FileLogging),
+                      MakeBooleanChecker())
+        .AddAttribute("EnableCuUpReport",
+                      "Enable CU-UP KPM indications",
+                      BooleanValue(true),
+                      MakeBooleanAccessor(&NrGnbNetDevice::m_enableCuUpReport),
+                      MakeBooleanChecker())
+        .AddAttribute("CuUpFileName",
+                      "Optional file receiving CU-UP KPM samples",
+                      StringValue(""),
+                      MakeStringAccessor(&NrGnbNetDevice::m_cuUpFileName),
+                      MakeStringChecker())
+        .AddAttribute("E2Periodicity",
+                      "KPM indication period in seconds",
+                      DoubleValue(0.1),
+                      MakeDoubleAccessor(&NrGnbNetDevice::m_e2Periodicity),
+                      MakeDoubleChecker<double>())
+        .AddAttribute("KPM_E2functionID",
+                      "KPM RAN function ID",
+                      UintegerValue(2),
+                      MakeUintegerAccessor(&NrGnbNetDevice::m_kpmFunctionId),
+                      MakeUintegerChecker<uint32_t>())
+        .AddAttribute("RC_E2functionID",
+                      "RC RAN function ID",
+                      UintegerValue(3),
+                      MakeUintegerAccessor(&NrGnbNetDevice::m_rcFunctionId),
+                      MakeUintegerChecker<uint32_t>())
+        .AddAttribute("CCC_E2functionID",
+                      "CCC RAN function ID",
+                      UintegerValue(4),
+                      MakeUintegerAccessor(&NrGnbNetDevice::m_cccFunctionId),
+                      MakeUintegerChecker<uint32_t>())
+        .AddAttribute("KpmMappingPolicy",
+                      "Translator policy: explicit-rejection, metadata-preserving, or legacy-compatibility",
+                      StringValue("explicit-rejection"),
+                      MakeStringAccessor(&NrGnbNetDevice::m_kpmMappingPolicy),
+                      MakeStringChecker());
     return tid;
 }
 
@@ -65,6 +122,160 @@ NrGnbNetDevice::NrGnbNetDevice()
 NrGnbNetDevice::~NrGnbNetDevice()
 {
     NS_LOG_FUNCTION(this);
+}
+
+void
+NrGnbNetDevice::SetE2Termination(Ptr<E2Termination> termination)
+{
+    m_e2Termination = termination;
+    if (!m_e2Termination)
+    {
+        return;
+    }
+
+    auto kpm = Create<KpmFunctionDescription>();
+    m_e2Termination->RegisterKpmCallbackToE2Sm(
+        m_kpmFunctionId,
+        kpm,
+        std::bind(&NrGnbNetDevice::KpmSubscriptionCallback, this, std::placeholders::_1));
+    auto rc = Create<RicControlFunctionDescription>();
+    m_e2Termination->RegisterSmCallbackToE2Sm(
+        m_rcFunctionId,
+        rc,
+        std::bind(&NrGnbNetDevice::RicControlMessageCallback, this, std::placeholders::_1));
+    // The current contrib API has no CccFunctionDescription; CCC uses the
+    // generic service-model registration boundary and decodes its own PDU.
+    auto ccc = Create<RicControlFunctionDescription>();
+    m_e2Termination->RegisterSmCallbackToE2Sm(
+        m_cccFunctionId,
+        ccc,
+        std::bind(&NrGnbNetDevice::CccControlMessageCallback, this, std::placeholders::_1));
+    m_e2Termination->RegisterCallbackFunctionToE2Sm(
+        1, std::bind(&NrGnbNetDevice::StopE2Reporting, this));
+}
+
+Ptr<E2Termination>
+NrGnbNetDevice::GetE2Termination() const
+{
+    return m_e2Termination;
+}
+
+void
+NrGnbNetDevice::KpmSubscriptionCallback(E2AP_PDU_t* request)
+{
+    if (!m_e2Termination || !request)
+    {
+        return;
+    }
+    m_e2Subscription = m_e2Termination->ProcessRicSubscriptionRequest(request);
+    m_e2ReportingEnabled = true;
+    m_e2ReportingEvent.Cancel();
+    SendKpmIndication();
+}
+
+void
+NrGnbNetDevice::SendKpmIndication()
+{
+    if (!m_e2ReportingEnabled || !m_e2Termination || !m_enableCuUpReport)
+    {
+        return;
+    }
+    KpmIndicationHeader::KpmRicIndicationHeaderValues headerValues;
+    headerValues.m_plmId = "00101";
+    headerValues.m_gnbId = std::to_string(m_cellId);
+    headerValues.m_nrCellId = m_cellId;
+    auto header = Create<KpmIndicationHeader>(KpmIndicationHeader::gNB, headerValues);
+    NrReportingSnapshot snapshot;
+    snapshot.cellId = m_cellId;
+    snapshot.plmnId = headerValues.m_plmId;
+    snapshot.reportingInterval = Seconds(m_e2Periodicity);
+    NrMappingPolicy policy = NrMappingPolicy::ExplicitRejection;
+    if (m_kpmMappingPolicy == "metadata-preserving")
+    {
+        policy = NrMappingPolicy::MetadataPreserving;
+    }
+    else if (m_kpmMappingPolicy == "legacy-compatibility")
+    {
+        policy = NrMappingPolicy::LegacyCompatibility;
+    }
+    else if (m_kpmMappingPolicy != "explicit-rejection")
+    {
+        NS_LOG_WARN("Unknown KPM mapping policy '" << m_kpmMappingPolicy
+                                                    << "'; using explicit rejection");
+    }
+    auto translation = NrModelTranslator::TranslateKpm(snapshot, policy);
+    for (const auto& diagnostic : translation.diagnostics)
+    {
+        NS_LOG_WARN("KPM translator [" << diagnostic.code << "]: " << diagnostic.message);
+    }
+    auto values = translation.values;
+    if (m_enableE2FileLogging)
+    {
+        const std::string fileName = m_cuUpFileName.empty()
+                                         ? "cuup-cell-" + std::to_string(m_cellId) + ".csv"
+                                         : m_cuUpFileName;
+        std::ofstream output(fileName, std::ios::app);
+        if (output)
+        {
+            output << Simulator::Now().GetSeconds() << ',' << m_cellId << ','
+                   << m_e2Periodicity << ',' << GetCurrentPowerConsumption() << '\n';
+        }
+    }
+    auto message = Create<KpmIndicationMessage>(values, m_e2Termination->SubscriptionMapRef());
+    auto* pdu = new E2AP_PDU;
+    encoding::generate_e2apv1_indication_request_parameterized(
+        pdu,
+        m_e2Subscription.requestorId,
+        m_e2Subscription.instanceId,
+        m_e2Subscription.ranFuncionId,
+        m_e2Subscription.actionId,
+        1,
+        static_cast<uint8_t*>(header->m_buffer),
+        header->m_size,
+        static_cast<uint8_t*>(message->m_buffer),
+        message->m_size);
+    m_e2Termination->SendE2Message(pdu);
+    delete pdu;
+    m_e2ReportingEvent = Simulator::Schedule(Seconds(m_e2Periodicity),
+                                              &NrGnbNetDevice::SendKpmIndication,
+                                              this);
+}
+
+void
+NrGnbNetDevice::StopE2Reporting()
+{
+    m_e2ReportingEnabled = false;
+    m_e2ReportingEvent.Cancel();
+    m_e2FileEvent.Cancel();
+}
+
+void
+NrGnbNetDevice::RicControlMessageCallback(E2AP_PDU_t* request)
+{
+    if (request)
+    {
+        auto control = Create<RicControlMessage>(request);
+        NS_LOG_INFO("Received RC control style " << control->m_requestType);
+    }
+}
+
+void
+NrGnbNetDevice::CccControlMessageCallback(E2AP_PDU_t* request)
+{
+    if (!request)
+    {
+        return;
+    }
+    auto message = Create<CccControlMessage>(request);
+    const auto translation = NrModelTranslator::TranslateCcc(*message);
+    for (const auto& diagnostic : translation.diagnostics)
+    {
+        NS_LOG_WARN("CCC translator [" << diagnostic.code << "]: " << diagnostic.message);
+    }
+    if (translation.command)
+    {
+        SetPortPower(translation.command->portPower);
+    }
 }
 
 Ptr<NrMacScheduler>
@@ -148,12 +359,19 @@ NrGnbNetDevice::DoInitialize()
     {
         ConfigureCell();
     }
+    if (m_e2Termination)
+    {
+        Simulator::ScheduleNow(&E2Termination::Start, m_e2Termination);
+    }
 }
 
 void
 NrGnbNetDevice::DoDispose()
 {
     NS_LOG_FUNCTION(this);
+
+    StopE2Reporting();
+    m_e2Termination = nullptr;
 
     m_rrc->Dispose();
     m_rrc = nullptr;
@@ -384,6 +602,54 @@ NrGnbNetDevice::GetArfcnBwpId(uint32_t arfcn) const
         }
     }
     NS_ABORT_MSG("gNB should have the searched arfcn");
+}
+
+void
+NrGnbNetDevice::SetPortPower(const std::vector<double>& portPower)
+{
+    NS_ASSERT_MSG(!portPower.empty(), "Port power allocation must not be empty");
+    for (double value : portPower)
+    {
+        NS_ASSERT_MSG(value >= 0.0, "Port power allocation must be non-negative");
+    }
+    const double scaling =
+        std::accumulate(portPower.begin(), portPower.end(), 0.0) / portPower.size();
+    for (const auto& bwp : m_ccMap)
+    {
+        if (bwp.second->GetPhy())
+        {
+            bwp.second->GetPhy()->SetPortPowerScaling(scaling);
+        }
+    }
+}
+
+std::vector<double>
+NrGnbNetDevice::GetPortPower() const
+{
+    std::vector<double> result;
+    for (const auto& bwp : m_ccMap)
+    {
+        if (bwp.second->GetPhy())
+        {
+            result.push_back(bwp.second->GetPhy()->GetPortPowerScaling());
+            break;
+        }
+    }
+    return result;
+}
+
+double
+NrGnbNetDevice::GetCurrentPowerConsumption() const
+{
+    double power = 0.0;
+    for (const auto& bwp : m_ccMap)
+    {
+        if (bwp.second->GetPhy())
+        {
+            power += bwp.second->GetPhy()->GetCurrentPowerConsumption();
+        }
+    }
+    return power;
 }
 
 } // namespace ns3

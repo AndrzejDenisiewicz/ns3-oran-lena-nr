@@ -51,7 +51,7 @@
 #include "ns3/ptr.h"
 #include "ns3/rng-seed-manager.h"
 #include "ns3/simulator.h"
-#include "ns3/string.h"
+#include "ns3/ns3-string.h"
 #include "ns3/test.h"
 #include "ns3/type-id.h"
 #include "ns3/udp-client-server-helper.h"

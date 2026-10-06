@@ -7,7 +7,7 @@
 
 #include "ns3/nr-export.h"
 #include "ns3/object.h"
-#include "ns3/string.h"
+#include "ns3/ns3-string.h"
 
 #include <map>
 
