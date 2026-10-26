@@ -15,6 +15,7 @@
 #include "ns3/oran-interface.h"
 #include "ns3/traced-callback.h"
 
+#include <atomic>
 #include <functional>
 #include <string>
 
@@ -213,6 +214,7 @@ class NR_EXPORT NrGnbNetDevice : public NrNetDevice
     void KpmSubscriptionCallback(E2AP_PDU_t* request);
     void CccControlMessageCallback(E2AP_PDU_t* request);
     void RicControlMessageCallback(E2AP_PDU_t* request);
+    void ProcessPendingE2Events();
     void SendKpmIndication();
     void StopE2Reporting();
     Ptr<NrGnbRrc> m_rrc;
@@ -229,8 +231,10 @@ class NR_EXPORT NrGnbNetDevice : public NrNetDevice
     bool m_isCellConfigured{false}; ///< variable to check whether the RRC has been configured
     Ptr<E2Termination> m_e2Termination;
     EventId m_e2ReportingEvent;
+    EventId m_e2ControlPollEvent;
     EventId m_e2FileEvent;
     E2Termination::RicSubscriptionRequest_rval_s m_e2Subscription{};
+    std::atomic<bool> m_kpmSubscriptionPending{false};
     bool m_e2ReportingEnabled{false};
     bool m_enableE2FileLogging{false};
     bool m_enableCuUpReport{true};

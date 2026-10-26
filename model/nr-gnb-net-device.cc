@@ -143,9 +143,7 @@ NrGnbNetDevice::SetE2Termination(Ptr<E2Termination> termination)
         m_rcFunctionId,
         rc,
         std::bind(&NrGnbNetDevice::RicControlMessageCallback, this, std::placeholders::_1));
-    // The current contrib API has no CccFunctionDescription; CCC uses the
-    // generic service-model registration boundary and decodes its own PDU.
-    auto ccc = Create<RicControlFunctionDescription>();
+    auto ccc = Create<CccFunctionDescription>();
     m_e2Termination->RegisterSmCallbackToE2Sm(
         m_cccFunctionId,
         ccc,
@@ -168,9 +166,24 @@ NrGnbNetDevice::KpmSubscriptionCallback(E2AP_PDU_t* request)
         return;
     }
     m_e2Subscription = m_e2Termination->ProcessRicSubscriptionRequest(request);
-    m_e2ReportingEnabled = true;
-    m_e2ReportingEvent.Cancel();
-    SendKpmIndication();
+    m_kpmSubscriptionPending.store(true);
+}
+
+void
+NrGnbNetDevice::ProcessPendingE2Events()
+{
+    if (m_kpmSubscriptionPending.exchange(false))
+    {
+        m_e2ReportingEnabled = true;
+        m_e2ReportingEvent.Cancel();
+        SendKpmIndication();
+    }
+    if (m_e2Termination)
+    {
+        m_e2ControlPollEvent = Simulator::Schedule(MilliSeconds(1),
+                                                    &NrGnbNetDevice::ProcessPendingE2Events,
+                                                    this);
+    }
 }
 
 void
@@ -266,14 +279,29 @@ NrGnbNetDevice::CccControlMessageCallback(E2AP_PDU_t* request)
     {
         return;
     }
+    NS_LOG_UNCOND("CCC callback received for cell " << m_cellId);
+    NS_LOG_UNCOND("CCC decoding control PDU for cell " << m_cellId);
     auto message = Create<CccControlMessage>(request);
-    const auto translation = NrModelTranslator::TranslateCcc(*message);
+    NS_LOG_UNCOND("CCC control PDU decoded for cell " << m_cellId);
+    size_t expectedPorts = 0;
+    for (const auto& bwp : m_ccMap)
+    {
+        if (bwp.second->GetPhy())
+        {
+            expectedPorts = bwp.second->GetPhy()->GetNumAntennaPorts();
+            break;
+        }
+    }
+    const auto translation = NrModelTranslator::TranslateCcc(*message, expectedPorts);
     for (const auto& diagnostic : translation.diagnostics)
     {
         NS_LOG_WARN("CCC translator [" << diagnostic.code << "]: " << diagnostic.message);
+        NS_LOG_UNCOND("CCC translator [" << diagnostic.code << "]: " << diagnostic.message);
     }
     if (translation.command)
     {
+        NS_LOG_UNCOND("CCC antennaMask accepted for cell " << m_cellId << " (" << expectedPorts
+                                                            << " ports)");
         SetPortPower(translation.command->portPower);
     }
 }
@@ -362,6 +390,8 @@ NrGnbNetDevice::DoInitialize()
     if (m_e2Termination)
     {
         Simulator::ScheduleNow(&E2Termination::Start, m_e2Termination);
+        m_e2ControlPollEvent = Simulator::ScheduleNow(&NrGnbNetDevice::ProcessPendingE2Events,
+                                                       this);
     }
 }
 
@@ -371,6 +401,7 @@ NrGnbNetDevice::DoDispose()
     NS_LOG_FUNCTION(this);
 
     StopE2Reporting();
+    m_e2ControlPollEvent.Cancel();
     m_e2Termination = nullptr;
 
     m_rrc->Dispose();
@@ -614,6 +645,7 @@ NrGnbNetDevice::SetPortPower(const std::vector<double>& portPower)
     }
     const double scaling =
         std::accumulate(portPower.begin(), portPower.end(), 0.0) / portPower.size();
+    NS_LOG_UNCOND("CCC SetPortPower applied on cell " << m_cellId << ": scaling=" << scaling);
     for (const auto& bwp : m_ccMap)
     {
         if (bwp.second->GetPhy())
